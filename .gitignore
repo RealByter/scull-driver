@@ -1,0 +1,5 @@
+scull.o
+Module.symvers
+scull.mod.o
+scull.ko
+.vscode/

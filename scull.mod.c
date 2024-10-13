@@ -47,6 +47,8 @@ __used __section("__versions") =
 	"class_destroy\0\0\0"
 	"\x24\x00\x00\x00\x33\xb3\x91\x60"
 	"unregister_chrdev_region\0\0\0\0"
+	"\x28\x00\x00\x00\xb3\x1c\xa2\x87"
+	"__ubsan_handle_out_of_bounds\0\0\0\0"
 	"\x1c\x00\x00\x00\x2b\x2f\xec\xe3"
 	"alloc_chrdev_region\0"
 	"\x18\x00\x00\x00\x73\xe0\x38\x00"
@@ -57,8 +59,6 @@ __used __section("__versions") =
 	"cdev_init\0\0\0"
 	"\x14\x00\x00\x00\x95\x76\xdc\xa2"
 	"cdev_add\0\0\0\0"
-	"\x28\x00\x00\x00\xb3\x1c\xa2\x87"
-	"__ubsan_handle_out_of_bounds\0\0\0\0"
 	"\x14\x00\x00\x00\xbb\x6d\xfb\xbd"
 	"__fentry__\0\0"
 	"\x18\x00\x00\x00\x3a\x0a\xd8\xfc"
@@ -68,4 +68,4 @@ __used __section("__versions") =
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "6EC0421109B6A8A04406FE1");
+MODULE_INFO(srcversion, "750C84A82D9CC6BED776C6C");
