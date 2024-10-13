@@ -4,7 +4,8 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 #include <linux/slab.h>
-#include <scull.h>
+#include <asm/uaccess.h>
+#include "scull.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -16,12 +17,14 @@ module_param(scull_qset, int, S_IRUGO);
 static dev_t dev;
 static struct class *scull_class = NULL;
 
-struct scull_qset {
+struct scull_qset
+{
     void **data;
     struct scull_qset *next;
 };
 
-struct scull_dev {
+struct scull_dev
+{
     struct scull_qset *data;
     int quantum;
     int qset;
@@ -38,17 +41,17 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 int scull_open(struct inode *inode, struct file *filp);
 int scull_release(struct inode *inode, struct file *filp);
 
-int scull_trim(struct scull_dev* dev)
+int scull_trim(struct scull_dev *dev)
 {
     struct scull_qset *next, *dptr;
     int qset = dev->qset;
     int i = 0;
 
-    for(dptr = dev->data; dptr; dptr = next)
+    for (dptr = dev->data; dptr; dptr = next)
     {
-        if(dptr->data)
+        if (dptr->data)
         {
-            for(int i = 0; i < qset; i++)
+            for (i = 0; i < qset; i++)
             {
                 kfree(dptr->data[i]);
             }
@@ -63,7 +66,34 @@ int scull_trim(struct scull_dev* dev)
     dev->qset = scull_qset;
     dev->data = NULL;
     return 0;
-}  
+}
+
+struct scull_qset *scull_follow(struct scull_dev *dev, int n)
+{
+    struct scull_qset *qs = dev->data;
+
+    if (!qs)
+    {
+        qs = dev->data = kmalloc(sizeof(struct scull_qset), GFP_KERNEL);
+        if (qs == NULL)
+            return NULL;
+        memset(qs, 0, sizeof(struct scull_qset));
+    }
+
+    while (n--)
+    {
+        if (!qs->next)
+        {
+            qs->next = kmalloc(sizeof(struct scull_qset), GFP_KERNEL);
+            if (qs->next == NULL)
+                return NULL;
+            memset(qs->next, 0, sizeof(struct scull_qset));
+        }
+        qs = qs->next;
+        continue;
+    }
+    return qs;
+}
 
 loff_t scull_llseek(struct file *filp, loff_t off, int whence)
 {
@@ -74,7 +104,44 @@ loff_t scull_llseek(struct file *filp, loff_t off, int whence)
 ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
     printk(KERN_ALERT "scull_read\n");
-    return 0;
+
+    struct scull_dev *dev = filp->private_data;
+    struct scull_qset *dptr;
+    int quantum = dev->quantum;
+    int itemsize = quantum * dev->qset;
+    int qset = dev->qset;
+    int item, s_pos, q_pos, rest;
+    ssize_t retval = 0;
+
+    if (*f_pos >= dev->size)
+        goto out;
+    if (*f_pos + count > dev->size)
+        count = dev->size - *f_pos;
+
+    item = (long)*f_pos / itemsize;
+    rest = (long)*f_pos % itemsize;
+    s_pos = rest / quantum;
+    q_pos = rest % quantum;
+
+    dptr = scull_follow(dev, item);
+
+    if (dptr == NULL || !dptr->data || !dptr->data[s_pos])
+        goto out;
+
+    if (count > quantum - q_pos)
+        count = quantum - q_pos;
+
+    if (copy_to_user(buf, dptr->data[s_pos] + q_pos, count))
+    {
+        retval = -EFAULT;
+        goto out;
+    }
+
+    *f_pos += count;
+    retval = count;
+
+out:
+    return retval;
 }
 
 ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos)
@@ -92,11 +159,11 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 int scull_open(struct inode *inode, struct file *filp)
 {
     printk(KERN_ALERT "scull_open\n");
-    
+
     struct scull_dev *dev = container_of(inode->i_cdev, struct scull_dev, cdev);
     filp->private_data = dev;
-    
-    if((filp->f_flags & O_ACCMODE) == O_WRONLY)
+
+    if ((filp->f_flags & O_ACCMODE) == O_WRONLY)
     {
         scull_trim(dev);
     }
@@ -140,7 +207,8 @@ static int __init scull_init(void)
         goto fail_class_create;
     }
 
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < 4; i++)
+    {
         device_create(scull_class, NULL, MKDEV(MAJOR(dev), i), NULL, "scull%d", i);
     }
 
@@ -159,12 +227,13 @@ static int __init scull_init(void)
             goto fail_cdev_add;
         }
     }
-    
+
     printk(KERN_ALERT "Hello, world\n");
     return 0;
 
 fail_cdev_add:
-    for (j = 0; j < 4; j++) {
+    for (j = 0; j < 4; j++)
+    {
         device_destroy(scull_class, MKDEV(MAJOR(dev), j));
     }
     class_destroy(scull_class);

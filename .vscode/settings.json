@@ -3,7 +3,8 @@
         "fs.h": "c",
         "dlm_device.h": "c",
         "device.h": "c",
-        "module.h": "c"
+        "module.h": "c",
+        "scull.h": "c"
     },
     "C_Cpp.errorSquiggles": "enabled"
 }

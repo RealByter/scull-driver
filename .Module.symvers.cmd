@@ -1,1 +1,1 @@
-savedcmd_/home/byter/Documents/scull/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/byter/Documents/scull/Module.symvers -T /home/byter/Documents/scull/modules.order -i Module.symvers -e 
+cmd_/home/byter/documents/repositories/scull-driver/Module.symvers := sed 's/\.ko$$/\.o/' /home/byter/documents/repositories/scull-driver/modules.order | scripts/mod/modpost -m -a  -o /home/byter/documents/repositories/scull-driver/Module.symvers -e -i Module.symvers   -T -
