@@ -3,13 +3,29 @@
 #include <linux/fs.h>
 #include <linux/device.h>
 #include <linux/cdev.h>
+#include <linux/slab.h>
+#include <scull.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
+
+static int scull_quantum = SCULL_QUANTUM;
+static int scull_qset = SCULL_QSET;
+module_param(scull_quantum, int, S_IRUGO);
+module_param(scull_qset, int, S_IRUGO);
 
 static dev_t dev;
 static struct class *scull_class = NULL;
 
+struct scull_qset {
+    void **data;
+    struct scull_qset *next;
+};
+
 struct scull_dev {
+    struct scull_qset *data;
+    int quantum;
+    int qset;
+    unsigned int size;
     struct cdev cdev;
 };
 
@@ -21,6 +37,33 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
 long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 int scull_open(struct inode *inode, struct file *filp);
 int scull_release(struct inode *inode, struct file *filp);
+
+int scull_trim(struct scull_dev* dev)
+{
+    struct scull_qset *next, *dptr;
+    int qset = dev->qset;
+    int i = 0;
+
+    for(dptr = dev->data; dptr; dptr = next)
+    {
+        if(dptr->data)
+        {
+            for(int i = 0; i < qset; i++)
+            {
+                kfree(dptr->data[i]);
+            }
+            kfree(dptr->data);
+            dptr->data = NULL;
+        }
+        next = dptr->next;
+        kfree(dptr);
+    }
+    dev->size = 0;
+    dev->quantum = scull_quantum;
+    dev->qset = scull_qset;
+    dev->data = NULL;
+    return 0;
+}  
 
 loff_t scull_llseek(struct file *filp, loff_t off, int whence)
 {
@@ -52,7 +95,12 @@ int scull_open(struct inode *inode, struct file *filp)
     
     struct scull_dev *dev = container_of(inode->i_cdev, struct scull_dev, cdev);
     filp->private_data = dev;
-    // need to implement trim on write only mode
+    
+    if((filp->f_flags & O_ACCMODE) == O_WRONLY)
+    {
+        scull_trim(dev);
+    }
+
     return 0;
 }
 
