@@ -1,0 +1,1 @@
+savedcmd_/home/byter/Documents/scull/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/byter/Documents/scull/Module.symvers -T /home/byter/Documents/scull/modules.order -i Module.symvers -e 
