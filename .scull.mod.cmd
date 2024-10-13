@@ -1,1 +1,1 @@
-cmd_/home/byter/documents/repositories/scull-driver/scull.mod := { echo  /home/byter/documents/repositories/scull-driver/scull.o;  echo; } > /home/byter/documents/repositories/scull-driver/scull.mod
+savedcmd_/home/byter/Documents/scull/scull.mod := printf '%s\n'   scull.o | awk '!x[$$0]++ { print("/home/byter/Documents/scull/"$$0) }' > /home/byter/Documents/scull/scull.mod

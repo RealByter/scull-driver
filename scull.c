@@ -77,7 +77,7 @@ static int __init scull_init(void)
         goto fail_alloc_chrdev;
     }
 
-    scull_class = class_create(THIS_MODULE, "scull");
+    scull_class = class_create("scull");
     if (IS_ERR(scull_class))
     {
         printk(KERN_ALERT "Failed to create class\n");
