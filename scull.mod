@@ -1,1 +1,2 @@
-/home/byter/Documents/scull/scull.o
+/home/byter/documents/repositories/scull-driver/scull.o
+

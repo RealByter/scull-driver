@@ -2,10 +2,17 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/device.h>
+#include <linux/cdev.h>
 MODULE_LICENSE("Dual BSD/GPL");
 
 static dev_t dev;
-static struct class* scull_class = NULL;
+static struct class *scull_class = NULL;
+
+struct scull_dev {
+    struct cdev cdev;
+};
+
+struct scull_dev scull_devs[4];
 
 loff_t scull_llseek(struct file *filp, loff_t off, int whence);
 ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos);
@@ -60,22 +67,22 @@ struct file_operations scull_fops = {
     .release = scull_release,
 };
 
-static int scull_init(void)
+static int __init scull_init(void)
 {
     int res;
     res = alloc_chrdev_region(&dev, 0, 4, "scull");
-    if(res < 0)
+    if (res < 0)
     {
         printk(KERN_ALERT "Failed to allocate char device region\n");
-        return res;
+        goto fail_alloc_chrdev;
     }
-    
-    scull_class = class_create("scull");
-    if(IS_ERR(scull_class))
+
+    scull_class = class_create(THIS_MODULE, "scull");
+    if (IS_ERR(scull_class))
     {
         printk(KERN_ALERT "Failed to create class\n");
-        unregister_chrdev_region(dev, 4);
-        return PTR_ERR(scull_class);
+        res = PTR_ERR(scull_class);
+        goto fail_class_create;
     }
 
     device_create(scull_class, NULL, MKDEV(MAJOR(dev), 0), NULL, "scull0");
@@ -83,12 +90,46 @@ static int scull_init(void)
     device_create(scull_class, NULL, MKDEV(MAJOR(dev), 2), NULL, "scull2");
     device_create(scull_class, NULL, MKDEV(MAJOR(dev), 3), NULL, "scull3");
 
-	printk(KERN_ALERT "Hello, world\n");
-	return 0;
+    for(int i = 0; i < 4; i++)
+    {
+        cdev_init(&scull_devs[i].cdev, &scull_fops);
+        scull_devs[i].cdev.owner = THIS_MODULE;
+        scull_devs[i].cdev.ops = &scull_fops;
+        res = cdev_add(&scull_devs[i].cdev, MKDEV(MAJOR(dev), i), 1);
+        if (res < 0)
+        {
+            printk(KERN_ALERT "Failed to add cdev\n");
+            for(int j = 0; j < i; j++)
+            {
+                cdev_del(&scull_devs[j].cdev);
+            }
+            goto fail_cdev_alloc;
+        }
+    }
+    
+
+    printk(KERN_ALERT "Hello, world\n");
+    return 0;
+
+    fail_cdev_alloc:
+        device_destroy(scull_class, MKDEV(MAJOR(dev), 0));
+        device_destroy(scull_class, MKDEV(MAJOR(dev), 1));
+        device_destroy(scull_class, MKDEV(MAJOR(dev), 2));
+        device_destroy(scull_class, MKDEV(MAJOR(dev), 3));
+        class_destroy(scull_class);
+    fail_class_create:
+        unregister_chrdev_region(dev, 4);
+    fail_alloc_chrdev:
+        return res;
 }
 
-static void scull_exit(void)
+static void __exit scull_exit(void)
 {
+    for(int i = 0; i < 4; i++)
+    {
+        cdev_del(&scull_devs[i].cdev);
+    }
+
     device_destroy(scull_class, MKDEV(MAJOR(dev), 0));
     device_destroy(scull_class, MKDEV(MAJOR(dev), 1));
     device_destroy(scull_class, MKDEV(MAJOR(dev), 2));
@@ -97,7 +138,7 @@ static void scull_exit(void)
     class_destroy(scull_class);
 
     unregister_chrdev_region(dev, 4);
-	printk(KERN_ALERT "Goodbye, cruel world\n");
+    printk(KERN_ALERT "Goodbye, cruel world\n");
 }
 
 module_init(scull_init);
