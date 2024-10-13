@@ -2,4 +2,4 @@ scull.o
 Module.symvers
 scull.mod.o
 scull.ko
-.vscode/
+.vscode/c_cpp_properties.json
