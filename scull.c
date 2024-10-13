@@ -49,6 +49,10 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 int scull_open(struct inode *inode, struct file *filp)
 {
     printk(KERN_ALERT "scull_open\n");
+    
+    struct scull_dev *dev = container_of(inode->i_cdev, struct scull_dev, cdev);
+    filp->private_data = dev;
+    // need to implement trim on write only mode
     return 0;
 }
 
@@ -80,7 +84,7 @@ static int __init scull_init(void)
         goto fail_alloc_chrdev;
     }
 
-    scull_class = class_create("scull");
+    scull_class = class_create("scull"); // no need to include the owner in v6
     if (IS_ERR(scull_class))
     {
         printk(KERN_ALERT "Failed to create class\n");
