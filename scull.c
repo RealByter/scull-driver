@@ -4,6 +4,7 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 #include <linux/slab.h>
+#include <linux/semaphore.h>
 #include <asm/uaccess.h>
 #include "scull.h"
 
@@ -29,6 +30,7 @@ struct scull_dev
     int quantum;
     int qset;
     unsigned int size;
+    struct semaphore sem;
     struct cdev cdev;
 };
 
@@ -113,6 +115,9 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_
     int item, s_pos, q_pos, rest;
     ssize_t retval = 0;
 
+    if(down_interruptible(&dev->sem))
+        return -ERESTARTSYS;
+
     if (*f_pos >= dev->size)
         goto out;
     if (*f_pos + count > dev->size)
@@ -141,6 +146,7 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_
     retval = count;
 
 out:
+    up(&dev->sem);
     return retval;
 }
 
@@ -154,6 +160,9 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
     int itemsize = quantum * qset;
     int item, s_pos, q_pos, rest;
     ssize_t retval = -ENOMEM;
+
+    if(down_interruptible(&dev->sem))
+        return -ERESTARTSYS;
 
     item = (long)*f_pos / itemsize;
     rest = (long)*f_pos % itemsize;
@@ -192,6 +201,7 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
         dev->size = *f_pos;
 
 out:
+    up(&dev->sem);
     return retval;
 }
 
@@ -259,6 +269,9 @@ static int __init scull_init(void)
 
     for (i = 0; i < 4; i++)
     {
+        scull_devs[i].quantum = scull_quantum;
+        scull_devs[i].qset = scull_qset;
+        mutex_init(&scull_devs[i].sem);
         cdev_init(&scull_devs[i].cdev, &scull_fops);
         scull_devs[i].cdev.owner = THIS_MODULE;
         res = cdev_add(&scull_devs[i].cdev, MKDEV(MAJOR(dev), i), 1);
