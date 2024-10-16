@@ -293,6 +293,7 @@ static void __exit scull_exit(void)
     int i;
     for (i = 0; i < 4; i++)
     {
+        scull_trim(&scull_devs[i]); // Free all allocated memory
         cdev_del(&scull_devs[i].cdev);
         device_destroy(scull_class, MKDEV(MAJOR(dev), i));
     }
