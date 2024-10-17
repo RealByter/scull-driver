@@ -370,6 +370,8 @@ static int __init scull_init(void)
         }
     }
 
+    dev += scull_p_init(dev);
+
     printk(KERN_ALERT "Hello, world\n");
     return 0;
 
@@ -396,6 +398,9 @@ static void __exit scull_exit(void)
     }
     class_destroy(scull_class);
     unregister_chrdev_region(dev, 4);
+
+    scull_p_cleanup();
+
     printk(KERN_ALERT "Goodbye, cruel world\n");
 }
 
