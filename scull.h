@@ -116,7 +116,7 @@ extern int scull_p_buffer;	/* pipe.c */
  * Prototypes for shared functions
  */
 
-int     scull_p_init(dev_t dev);
+int     scull_p_init(void);
 void    scull_p_cleanup(void);
 int     scull_access_init(dev_t dev);
 void    scull_access_cleanup(void);
