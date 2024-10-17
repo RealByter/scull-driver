@@ -29,6 +29,12 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 int scull_open(struct inode *inode, struct file *filp);
 int scull_release(struct inode *inode, struct file *filp);
 
+static int scull_p_fasync(int fd, struct file *filp, int mode)
+{
+    struct scull_pipe *dev = filp->private_data;
+    return fasync_helper(fd, filp, mode, &dev->async_queue);
+}
+
 int scull_trim(struct scull_dev *dev)
 {
     struct scull_qset *next, *dptr;
@@ -86,6 +92,28 @@ struct scull_qset *scull_follow(struct scull_dev *dev, int n)
 loff_t scull_llseek(struct file *filp, loff_t off, int whence)
 {
     printk(KERN_ALERT "scull_llseek\n");
+
+    struct scull_dev *dev = filp->private_data;
+    loff_t newpos;
+    switch (whence)
+    {
+    case 0: /* SEEK_SET */
+        newpos = off;
+        break;
+    case 1: /* SEEK_CUR */
+        newpos = filp->f_pos + off;
+        break;
+    case 2: /* SEEK_END */
+        newpos = dev->size + off;
+        break;
+    default: /* can't happen */
+        return -EINVAL;
+    }
+    if (newpos < 0)
+        return -EINVAL;
+    filp->f_pos = newpos;
+    return newpos;
+
     return 0;
 }
 
