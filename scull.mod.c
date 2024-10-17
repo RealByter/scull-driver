@@ -39,6 +39,14 @@ __used __section("__versions") =
 	"_printk\0"
 	"\x1c\x00\x00\x00\xca\x39\x82\x5b"
 	"__x86_return_thunk\0\0"
+	"\x10\x00\x00\x00\x89\xbc\xcb\xc6"
+	"capable\0"
+	"\x20\x00\x00\x00\x05\x96\x09\x3a"
+	"__get_user_nocheck_4\0\0\0\0"
+	"\x18\x00\x00\x00\xeb\x5c\xfd\xb2"
+	"__put_user_4\0\0\0\0"
+	"\x20\x00\x00\x00\x89\xff\x6a\x8d"
+	"__put_user_nocheck_4\0\0\0\0"
 	"\x1c\x00\x00\x00\x2b\x2f\xec\xe3"
 	"alloc_chrdev_region\0"
 	"\x18\x00\x00\x00\x73\xe0\x38\x00"
@@ -92,4 +100,4 @@ __used __section("__versions") =
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "221467A4454147CDF51B625");
+MODULE_INFO(srcversion, "481092A3A24A22D4D416C5B");
