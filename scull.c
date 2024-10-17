@@ -18,22 +18,6 @@ module_param(scull_qset, int, S_IRUGO);
 static dev_t dev;
 static struct class *scull_class = NULL;
 
-struct scull_qset
-{
-    void **data;
-    struct scull_qset *next;
-};
-
-struct scull_dev
-{
-    struct scull_qset *data;
-    int quantum;
-    int qset;
-    unsigned int size;
-    struct semaphore sem;
-    struct cdev cdev;
-};
-
 struct scull_dev scull_devs[4];
 
 loff_t scull_llseek(struct file *filp, loff_t off, int whence);
