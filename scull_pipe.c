@@ -31,7 +31,6 @@ static int scull_p_nr_devs = SCULL_P_NR_DEVS;
 int scull_p_buffer = SCULL_P_BUFFER;
 static dev_t scull_p_devno;
 
-
 module_param(scull_p_nr_devs, int, 0);
 module_param(scull_p_buffer, int, 0);
 
@@ -88,6 +87,22 @@ static int scull_p_release(struct inode *inode, struct file *filp)
     }
     up(&dev->sem);
     return 0;
+}
+
+static unsigned int scull_p_poll(struct file *filp, poll_table *wait)
+{
+    struct scull_pipe *dev = filp->private_data;
+    unsigned int mask = 0;
+
+    down(&dev->sem);
+    poll_wait(filp, &dev->inq, wait);
+    poll_wait(filp, &dev->outq, wait);
+    if (dev->rp != dev->wp)
+        mask |= POLLIN | POLLRDNORM;
+    if (spacefree(dev))
+        mask |= POLLOUT | POLLWRNORM;
+    up(&dev->sem);
+    return mask;
 }
 
 static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
@@ -168,77 +183,77 @@ static ssize_t scull_p_write(struct file *filp, const char __user *buf, size_t c
         return -ERESTARTSYS;
 
     result = scull_getwritespace(dev, filp);
-    if(result)
+    if (result)
         return result;
 
     count = min(count, (size_t)spacefree(dev));
-    if(dev->wp >= dev->rp)
+    if (dev->wp >= dev->rp)
         count = min(count, (size_t)(dev->end - dev->wp));
     else
         count = min(count, (size_t)(dev->rp - dev->wp - 1));
-    
+
     PDEBUG("Going to accept %li bytes to %p from %p\n", (long)count, dev->wp, buf);
-    if(copy_from_user(dev->wp, buf, count))
+    if (copy_from_user(dev->wp, buf, count))
     {
         up(&dev->sem);
         return -EFAULT;
     }
 
     dev->wp += count;
-    if(dev->wp == dev->end)
+    if (dev->wp == dev->end)
         dev->wp = dev->buffer;
     up(&dev->sem);
 
     wake_up_interruptible(&dev->inq);
 
-    if(dev->async_queue)
+    if (dev->async_queue)
         kill_fasync(&dev->async_queue, SIGIO, POLL_IN);
     PDEBUG("\"%s\" did write %li bytes\n", current->comm, (long)count);
     return count;
 }
 
 struct file_operations scull_pipe_fops = {
-	.owner =	THIS_MODULE,
-	.llseek =	no_llseek,
-	.read =		scull_p_read,
-	.write =	scull_p_write,
-	// .poll =		scull_p_poll,
-	.unlocked_ioctl = scull_ioctl,
-	.open =		scull_p_open,
-	.release =	scull_p_release,
-	// .fasync =	scull_p_fasync,
+    .owner = THIS_MODULE,
+    .llseek = no_llseek,
+    .read = scull_p_read,
+    .write = scull_p_write,
+    .poll = scull_p_poll,
+    .unlocked_ioctl = scull_ioctl,
+    .open = scull_p_open,
+    .release = scull_p_release,
+    // .fasync =	scull_p_fasync,
 };
-
 
 static void scull_p_setup_cdev(struct scull_pipe *dev, int index)
 {
-	int err, devno = scull_p_devno + index;
-	cdev_init(&dev->cdev, &scull_pipe_fops);
-	dev->cdev.owner = THIS_MODULE;
-	err = cdev_add (&dev->cdev, devno, 1);
-	if (err)
-		printk(KERN_NOTICE "Error %d adding scullpipe%d", err, index);
+    int err, devno = scull_p_devno + index;
+    cdev_init(&dev->cdev, &scull_pipe_fops);
+    dev->cdev.owner = THIS_MODULE;
+    err = cdev_add(&dev->cdev, devno, 1);
+    if (err)
+        printk(KERN_NOTICE "Error %d adding scullpipe%d", err, index);
 }
 
- 
 int scull_p_init()
 {
-	int i, result;
+    int i, result;
 
-	result = alloc_chrdev_region(&scull_p_devno, 0, scull_p_nr_devs, "scullp");
-	if (result < 0) {
-		printk(KERN_NOTICE "Unable to get scullp region, error %d\n", result);
-		return 0;
-	}
- 
-	scull_p_devices = kmalloc(scull_p_nr_devs * sizeof(struct scull_pipe), GFP_KERNEL);
-	if (scull_p_devices == NULL) {
-		unregister_chrdev_region(scull_p_devno, scull_p_nr_devs);
-		return 0;
-	}
+    result = alloc_chrdev_region(&scull_p_devno, 0, scull_p_nr_devs, "scullp");
+    if (result < 0)
+    {
+        printk(KERN_NOTICE "Unable to get scullp region, error %d\n", result);
+        return 0;
+    }
 
-    scull_pipe_class = class_create("scullp"); 
-    if(IS_ERR(scull_pipe_class))
+    scull_p_devices = kmalloc(scull_p_nr_devs * sizeof(struct scull_pipe), GFP_KERNEL);
+    if (scull_p_devices == NULL)
+    {
+        unregister_chrdev_region(scull_p_devno, scull_p_nr_devs);
+        return 0;
+    }
+
+    scull_pipe_class = class_create("scullp");
+    if (IS_ERR(scull_pipe_class))
     {
         printk(KERN_ALERT "Failed to create class\n");
         result = PTR_ERR(scull_pipe_class);
@@ -247,30 +262,32 @@ int scull_p_init()
         return 0;
     }
 
-	memset(scull_p_devices, 0, scull_p_nr_devs * sizeof(struct scull_pipe));
-	for (i = 0; i < scull_p_nr_devs; i++) {
-		init_waitqueue_head(&(scull_p_devices[i].inq));
-		init_waitqueue_head(&(scull_p_devices[i].outq));
-		sema_init(&scull_p_devices[i].sem, 1);
+    memset(scull_p_devices, 0, scull_p_nr_devs * sizeof(struct scull_pipe));
+    for (i = 0; i < scull_p_nr_devs; i++)
+    {
+        init_waitqueue_head(&(scull_p_devices[i].inq));
+        init_waitqueue_head(&(scull_p_devices[i].outq));
+        sema_init(&scull_p_devices[i].sem, 1);
         device_create(scull_pipe_class, NULL, MKDEV(MAJOR(scull_p_devno), i), NULL, "scullp%d", i);
-		scull_p_setup_cdev(scull_p_devices + i, i);
-	}
+        scull_p_setup_cdev(scull_p_devices + i, i);
+    }
 
-	return scull_p_nr_devs;
+    return scull_p_nr_devs;
 }
 
 void scull_p_cleanup(void)
 {
-	int i;
+    int i;
 
-	if (!scull_p_devices)
-		return; 
+    if (!scull_p_devices)
+        return;
 
-	for (i = 0; i < scull_p_nr_devs; i++) {
-		cdev_del(&scull_p_devices[i].cdev);
-		kfree(scull_p_devices[i].buffer);
-	}
-	kfree(scull_p_devices);
-	unregister_chrdev_region(scull_p_devno, scull_p_nr_devs);
-	scull_p_devices = NULL; 
+    for (i = 0; i < scull_p_nr_devs; i++)
+    {
+        cdev_del(&scull_p_devices[i].cdev);
+        kfree(scull_p_devices[i].buffer);
+    }
+    kfree(scull_p_devices);
+    unregister_chrdev_region(scull_p_devno, scull_p_nr_devs);
+    scull_p_devices = NULL;
 }
