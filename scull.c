@@ -192,6 +192,21 @@ out:
 long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
     printk(KERN_ALERT "scull_ioctl\n");
+
+    int err = 0;
+    int tmp;
+    int retval = 0;
+
+    if(_IOC_TYPE(cmd) != SCULL_IOC_MAGIC)
+        return -ENOTTY;
+    if(_IOC_NR(cmd) > SCULL_IOC_MAXNR)
+        return -ENOTTY;
+
+    if(_IOC_DIR(cmd) & _IOC_READ)
+        err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
+    else if(_IOC_DIR(cmd) & _IOC_WRITE)
+        err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
+    
     return 0;
 }
 
