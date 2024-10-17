@@ -97,16 +97,16 @@ loff_t scull_llseek(struct file *filp, loff_t off, int whence)
     loff_t newpos;
     switch (whence)
     {
-    case 0: /* SEEK_SET */
+    case 0:
         newpos = off;
         break;
-    case 1: /* SEEK_CUR */
+    case 1:
         newpos = filp->f_pos + off;
         break;
-    case 2: /* SEEK_END */
+    case 2: 
         newpos = dev->size + off;
         break;
-    default: /* can't happen */
+    default: 
         return -EINVAL;
     }
     if (newpos < 0)

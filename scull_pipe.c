@@ -74,7 +74,7 @@ static int scull_p_release(struct inode *inode, struct file *filp)
 {
     struct scull_pipe *dev = filp->private_data;
 
-    // scull_p_fasync(-1, filp, 0);
+    scull_p_fasync(-1, filp, 0);
     down(&dev->sem);
     if (filp->f_mode & FMODE_READ)
         dev->nreaders--;
