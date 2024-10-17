@@ -1,5 +1,16 @@
 scull.o
 Module.symvers
+.Modules.symvers.cmd
+modules.order
 scull.mod.o
+.scull.mod.o.cmd
 scull.ko
+.scull.ko.cmd
+scull.o
+.scull.o.cmd
+scull.mod
+.scull.mod.cmd
+scull.mod.c
+scull.mod.o
+.scull.mod.o.cmd
 .vscode/c_cpp_properties.json
