@@ -1,1 +1,1 @@
-cmd_/home/byter/documents/repositories/scull-driver/modules.order := {   echo /home/byter/documents/repositories/scull-driver/scull.ko; :; } | awk '!x[$$0]++' - > /home/byter/documents/repositories/scull-driver/modules.order
+savedcmd_/home/byter/Documents/scull-driver/modules.order := {   echo /home/byter/Documents/scull-driver/scull.o; :; } > /home/byter/Documents/scull-driver/modules.order

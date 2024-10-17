@@ -270,7 +270,7 @@ static int __init scull_init(void)
     {
         scull_devs[i].quantum = scull_quantum;
         scull_devs[i].qset = scull_qset;
-        mutex_init(&scull_devs[i].sem);
+        sema_init(&scull_devs[i].sem, 1);
         cdev_init(&scull_devs[i].cdev, &scull_fops);
         scull_devs[i].cdev.owner = THIS_MODULE;
         res = cdev_add(&scull_devs[i].cdev, MKDEV(MAJOR(dev), i), 1);
