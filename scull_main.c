@@ -17,7 +17,7 @@ int scull_qset = SCULL_QSET;
 module_param(scull_quantum, int, S_IRUGO);
 module_param(scull_qset, int, S_IRUGO);
 
-static dev_t dev;
+static dev_t scull_devno;
 static struct class *scull_class = NULL;
 
 struct scull_dev scull_devs[4];
@@ -331,7 +331,7 @@ static int __init scull_init(void)
     int res;
     int i, j;
 
-    res = alloc_chrdev_region(&dev, 0, 4, "scull");
+    res = alloc_chrdev_region(&scull_devno, 0, 4, "scull");
     if (res < 0)
     {
         printk(KERN_ALERT "Failed to allocate char device region\n");
@@ -348,7 +348,7 @@ static int __init scull_init(void)
 
     for (i = 0; i < 4; i++)
     {
-        device_create(scull_class, NULL, MKDEV(MAJOR(dev), i), NULL, "scull%d", i);
+        device_create(scull_class, NULL, MKDEV(MAJOR(scull_devno), i), NULL, "scull%d", i);
     }
 
     for (i = 0; i < 4; i++)
@@ -358,7 +358,7 @@ static int __init scull_init(void)
         sema_init(&scull_devs[i].sem, 1);
         cdev_init(&scull_devs[i].cdev, &scull_fops);
         scull_devs[i].cdev.owner = THIS_MODULE;
-        res = cdev_add(&scull_devs[i].cdev, MKDEV(MAJOR(dev), i), 1);
+        res = cdev_add(&scull_devs[i].cdev, MKDEV(MAJOR(scull_devno), i), 1);
         if (res < 0)
         {
             printk(KERN_ALERT "Failed to add cdev\n");
@@ -370,7 +370,7 @@ static int __init scull_init(void)
         }
     }
 
-    dev += scull_p_init(dev);
+    scull_devno += scull_p_init();
 
     printk(KERN_ALERT "Hello, world\n");
     return 0;
@@ -378,11 +378,11 @@ static int __init scull_init(void)
 fail_cdev_add:
     for (j = 0; j < 4; j++)
     {
-        device_destroy(scull_class, MKDEV(MAJOR(dev), j));
+        device_destroy(scull_class, MKDEV(MAJOR(scull_devno), j));
     }
     class_destroy(scull_class);
 fail_class_create:
-    unregister_chrdev_region(dev, 4);
+    unregister_chrdev_region(scull_devno, 4);
 fail_alloc_chrdev:
     return res;
 }
@@ -394,10 +394,10 @@ static void __exit scull_exit(void)
     {
         scull_trim(&scull_devs[i]); // Free all allocated memory
         cdev_del(&scull_devs[i].cdev);
-        device_destroy(scull_class, MKDEV(MAJOR(dev), i));
+        device_destroy(scull_class, MKDEV(MAJOR(scull_devno), i));
     }
     class_destroy(scull_class);
-    unregister_chrdev_region(dev, 4);
+    unregister_chrdev_region(scull_devno, 4);
 
     scull_p_cleanup();
 

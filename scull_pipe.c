@@ -29,7 +29,8 @@ struct scull_pipe
 static struct class *scull_pipe_class = NULL;
 static int scull_p_nr_devs = SCULL_P_NR_DEVS;
 int scull_p_buffer = SCULL_P_BUFFER;
-dev_t scull_p_devno;
+static dev_t scull_p_devno;
+
 
 module_param(scull_p_nr_devs, int, 0);
 module_param(scull_p_buffer, int, 0);
@@ -220,19 +221,19 @@ static void scull_p_setup_cdev(struct scull_pipe *dev, int index)
 }
 
  
-int scull_p_init(dev_t firstdev)
+int scull_p_init()
 {
 	int i, result;
 
-	result = register_chrdev_region(firstdev, scull_p_nr_devs, "scullp");
+	result = alloc_chrdev_region(&scull_p_devno, 0, scull_p_nr_devs, "scullp");
 	if (result < 0) {
 		printk(KERN_NOTICE "Unable to get scullp region, error %d\n", result);
 		return 0;
 	}
-	scull_p_devno = firstdev;
+ 
 	scull_p_devices = kmalloc(scull_p_nr_devs * sizeof(struct scull_pipe), GFP_KERNEL);
 	if (scull_p_devices == NULL) {
-		unregister_chrdev_region(firstdev, scull_p_nr_devs);
+		unregister_chrdev_region(scull_p_devno, scull_p_nr_devs);
 		return 0;
 	}
 
@@ -242,7 +243,7 @@ int scull_p_init(dev_t firstdev)
         printk(KERN_ALERT "Failed to create class\n");
         result = PTR_ERR(scull_pipe_class);
         kfree(scull_p_devices);
-        unregister_chrdev_region(firstdev, scull_p_nr_devs);
+        unregister_chrdev_region(scull_p_devno, scull_p_nr_devs);
         return 0;
     }
 
@@ -251,7 +252,7 @@ int scull_p_init(dev_t firstdev)
 		init_waitqueue_head(&(scull_p_devices[i].inq));
 		init_waitqueue_head(&(scull_p_devices[i].outq));
 		sema_init(&scull_p_devices[i].sem, 1);
-        device_create(scull_pipe_class, NULL, MKDEV(MAJOR(firstdev), i), NULL, "scullp%d", i);
+        device_create(scull_pipe_class, NULL, MKDEV(MAJOR(scull_p_devno), i), NULL, "scullp%d", i);
 		scull_p_setup_cdev(scull_p_devices + i, i);
 	}
 
