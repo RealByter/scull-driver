@@ -10,8 +10,8 @@
 
 MODULE_LICENSE("Dual BSD/GPL");
 
-static int scull_quantum = SCULL_QUANTUM;
-static int scull_qset = SCULL_QSET;
+int scull_quantum = SCULL_QUANTUM;
+int scull_qset = SCULL_QSET;
 module_param(scull_quantum, int, S_IRUGO);
 module_param(scull_qset, int, S_IRUGO);
 
