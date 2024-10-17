@@ -105,6 +105,12 @@ static unsigned int scull_p_poll(struct file *filp, poll_table *wait)
     return mask;
 }
 
+static int scull_p_fasync(int fd, struct file *filp, int mode)
+{
+    struct scull_pipe *dev = filp->private_data;
+    return fasync_helper(fd, filp, mode, &dev->async_queue);
+}
+
 static ssize_t scull_p_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
     struct scull_pipe *dev = filp->private_data;
@@ -221,7 +227,7 @@ struct file_operations scull_pipe_fops = {
     .unlocked_ioctl = scull_ioctl,
     .open = scull_p_open,
     .release = scull_p_release,
-    // .fasync =	scull_p_fasync,
+    .fasync =	scull_p_fasync,
 };
 
 static void scull_p_setup_cdev(struct scull_pipe *dev, int index)
