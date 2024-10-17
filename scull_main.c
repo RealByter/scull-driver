@@ -29,12 +29,6 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 int scull_open(struct inode *inode, struct file *filp);
 int scull_release(struct inode *inode, struct file *filp);
 
-static int scull_p_fasync(int fd, struct file *filp, int mode)
-{
-    struct scull_pipe *dev = filp->private_data;
-    return fasync_helper(fd, filp, mode, &dev->async_queue);
-}
-
 int scull_trim(struct scull_dev *dev)
 {
     struct scull_qset *next, *dptr;
