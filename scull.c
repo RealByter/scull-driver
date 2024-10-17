@@ -5,6 +5,8 @@
 #include <linux/cdev.h>
 #include <linux/slab.h>
 #include <linux/semaphore.h>
+#include <linux/sched.h>
+#include <linux/wait.h>
 #include <asm/uaccess.h>
 #include "scull.h"
 
@@ -99,7 +101,7 @@ ssize_t scull_read(struct file *filp, char __user *buf, size_t count, loff_t *f_
     int item, s_pos, q_pos, rest;
     ssize_t retval = 0;
 
-    if(down_interruptible(&dev->sem))
+    if (down_interruptible(&dev->sem))
         return -ERESTARTSYS;
 
     if (*f_pos >= dev->size)
@@ -145,7 +147,7 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
     int item, s_pos, q_pos, rest;
     ssize_t retval = -ENOMEM;
 
-    if(down_interruptible(&dev->sem))
+    if (down_interruptible(&dev->sem))
         return -ERESTARTSYS;
 
     item = (long)*f_pos / itemsize;
@@ -154,26 +156,26 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
     q_pos = rest % quantum;
 
     dptr = scull_follow(dev, item);
-    if(dptr == NULL)
+    if (dptr == NULL)
         goto out;
-    if(!dptr->data)
+    if (!dptr->data)
     {
         dptr->data = kmalloc(qset * sizeof(char *), GFP_KERNEL);
-        if(!dptr->data)
+        if (!dptr->data)
             goto out;
         memset(dptr->data, 0, qset * sizeof(char *));
     }
-    if(!dptr->data[s_pos])
+    if (!dptr->data[s_pos])
     {
         dptr->data[s_pos] = kmalloc(quantum, GFP_KERNEL);
-        if(!dptr->data[s_pos])
+        if (!dptr->data[s_pos])
             goto out;
     }
 
-    if(count > quantum - q_pos)
+    if (count > quantum - q_pos)
         count = quantum - q_pos;
 
-    if(copy_from_user(dptr->data[s_pos] + q_pos, buf, count))
+    if (copy_from_user(dptr->data[s_pos] + q_pos, buf, count))
     {
         retval = -EFAULT;
         goto out;
@@ -181,7 +183,7 @@ ssize_t scull_write(struct file *filp, const char __user *buf, size_t count, lof
     *f_pos += count;
     retval = count;
 
-    if(dev->size < *f_pos)
+    if (dev->size < *f_pos)
         dev->size = *f_pos;
 
 out:
@@ -197,17 +199,100 @@ long scull_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     int tmp;
     int retval = 0;
 
-    if(_IOC_TYPE(cmd) != SCULL_IOC_MAGIC)
+    if (_IOC_TYPE(cmd) != SCULL_IOC_MAGIC)
         return -ENOTTY;
-    if(_IOC_NR(cmd) > SCULL_IOC_MAXNR)
+    if (_IOC_NR(cmd) > SCULL_IOC_MAXNR)
         return -ENOTTY;
 
-    if(_IOC_DIR(cmd) & _IOC_READ)
+    if (_IOC_DIR(cmd) & _IOC_READ)
         err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
-    else if(_IOC_DIR(cmd) & _IOC_WRITE)
+    else if (_IOC_DIR(cmd) & _IOC_WRITE)
         err = !access_ok((void __user *)arg, _IOC_SIZE(cmd));
-    
-    return 0;
+    if (err)
+        return -EFAULT;
+
+    switch (cmd)
+    {
+    case SCULL_IOCRESET:
+        scull_quantum = SCULL_QUANTUM;
+        scull_qset = SCULL_QSET;
+        break;
+
+    case SCULL_IOCSQUANTUM: /* Set: arg points to the value */
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        retval = __get_user(scull_quantum, (int __user *)arg);
+        break;
+
+    case SCULL_IOCTQUANTUM: /* Tell: arg is the value */
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        scull_quantum = arg;
+        break;
+
+    case SCULL_IOCGQUANTUM: /* Get: arg is pointer to result */
+        retval = __put_user(scull_quantum, (int __user *)arg);
+        break;
+
+    case SCULL_IOCQQUANTUM: /* Query: return it (it's positive) */
+        return scull_quantum;
+
+    case SCULL_IOCXQUANTUM: /* eXchange: use arg as pointer */
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        tmp = scull_quantum;
+        retval = __get_user(scull_quantum, (int __user *)arg);
+        if (retval == 0)
+            retval = __put_user(tmp, (int __user *)arg);
+        break;
+
+    case SCULL_IOCHQUANTUM: /* sHift: like Tell + Query */
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        tmp = scull_quantum;
+        scull_quantum = arg;
+        return tmp;
+
+    case SCULL_IOCSQSET:
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        retval = __get_user(scull_qset, (int __user *)arg);
+        break;
+
+    case SCULL_IOCTQSET:
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        scull_qset = arg;
+        break;
+
+    case SCULL_IOCGQSET:
+        retval = __put_user(scull_qset, (int __user *)arg);
+        break;
+
+    case SCULL_IOCQQSET:
+        return scull_qset;
+
+    case SCULL_IOCXQSET:
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        tmp = scull_qset;
+        retval = __get_user(scull_qset, (int __user *)arg);
+        if (retval == 0)
+            retval = put_user(tmp, (int __user *)arg);
+        break;
+
+    case SCULL_IOCHQSET:
+        if (!capable(CAP_SYS_ADMIN))
+            return -EPERM;
+        tmp = scull_qset;
+        scull_qset = arg;
+        return tmp;
+
+    default:
+        return -ENOTTY;
+    }
+
+    return retval;
 }
 
 int scull_open(struct inode *inode, struct file *filp)
