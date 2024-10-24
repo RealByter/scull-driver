@@ -1,1 +1,1 @@
-A simple scull driver from the book linux device drivers 3
+A simple char driver from the book linux device drivers 3
